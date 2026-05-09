@@ -122,6 +122,53 @@ modes:
 | postgres に繋がらない | `incus exec <project>/postgres -- pg_isready` 確認、cloud-init 完了マーカー (`/var/lib/incus-sandbox-pg-warm-ready`) 確認 |
 | service が立ち上がらない | `bin/exec.sh <project> <wt> <svc> -- journalctl -u alc-service@<bin> -e` |
 
+## Backend + Frontend 同時改修ワークフロー
+
+backend (この sandbox) + frontend (alc-app / nuxt-notify 等) を一緒に直す機能の場合、
+**両 repo で同じ wt-name を使う** と `/wt-quick --incus-backend rust-alc-api` が
+wt-name で port を引いて auto-pair する。
+
+```bash
+WT=feat-xxx  # 両 repo で揃える
+
+# 1. backend worktree + sandbox
+cd ~/rust/rust-alc-api && git worktree add -b $WT .claude/worktrees/$WT origin/main
+~/git/incus-sandbox/bin/build.sh rust-alc-api $WT
+~/git/incus-sandbox/bin/up.sh    rust-alc-api $WT full
+
+# 2. frontend worktree + tunnel (--incus-backend が wt-name で port 引く)
+cd ~/js/nuxt-notify && git worktree add -b $WT .claude/worktrees/$WT origin/main
+cd .claude/worktrees/$WT && npm install
+~/js/.dev-proxy/up-wt.sh --quick --incus-backend rust-alc-api nuxt-notify $WT
+
+# 3. 編集はホスト側で完結
+$EDITOR ~/rust/rust-alc-api/.claude/worktrees/$WT/...   # backend
+~/git/incus-sandbox/bin/build.sh rust-alc-api $WT       # incremental build (sccache)
+~/git/incus-sandbox/bin/exec.sh rust-alc-api $WT backend -- systemctl restart alc-service@rust-alc-api
+
+$EDITOR ~/js/nuxt-notify/.claude/worktrees/$WT/...      # frontend (Vite HMR で auto)
+
+# 4. tear down
+~/git/incus-sandbox/bin/down.sh rust-alc-api $WT --purge
+~/js/.dev-proxy/down-wt.sh nuxt-notify $WT
+```
+
+### 罠
+
+- **`/wt-quick --auth-skip <tenant_id>` と OAuth は排他**: `@ippoan/auth-client` の
+  `loadFromStorage` は `stagingTenantId` 設定時に `clearStorage()` で localStorage
+  と JWT を破棄する。`require_jwt` で守られた admin endpoint を試すなら
+  `--auth-skip` を**外して** Google ログインで実 JWT を取る。
+- **JWT_SECRET 同期**: backend の `JWT_SECRET` を staging と同値
+  (`rust-logi-jwt-secret-prod-2026`、auth-worker の `.dev.vars` 由来) にしないと
+  staging 経由で取った JWT が backend で signature mismatch になる。
+  manifest にデフォルトで焼いてある。
+- **DB 揮発**: tenant は `00000000-...001` (Default Org) のみ。staging tenant の
+  データが要るなら `STAGING_MODE=true` の `/api/staging/import` か psql で
+  `INSERT INTO alc_api.tenants ...` する。
+- **編集はホスト**: Incus に `incus exec` で入るのは debug 時のみ
+  (`journalctl -u alc-service@rust-alc-api -f` / `psql` 等)。
+
 ## 参考
 
 - 元の設計プラン: `~/.claude/plans/github-app-staged-hejlsberg.md`
