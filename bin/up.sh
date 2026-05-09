@@ -55,9 +55,10 @@ case "$MODE" in
     [[ -n "$SOLO_SVC" ]] || { usage; die "solo mode requires <service>"; }
     yq -r '.services | keys | .[]' "$MANIFEST" | grep -qx "$SOLO_SVC" \
       || die "service not in manifest: $SOLO_SVC"
+    # Mike Farah yq: env var を strenv で参照 (jq の --arg 互換は無い)
     mapfile -t SERVICES < <(
-      yq -r --arg svc "$SOLO_SVC" \
-        '.modes.solo.instances[] | sub("<arg>"; $svc)' "$MANIFEST"
+      svc="$SOLO_SVC" yq -r \
+        '.modes.solo.instances[] | sub("<arg>", strenv(svc))' "$MANIFEST"
     )
     ;;
   *)
@@ -136,13 +137,13 @@ deploy_service_unit() {
   local svc_key="$2"   # manifest key (backend / tenko / ...)
 
   local binary pre_start
-  binary="$(yq -r --arg s "$svc_key" '.services[$s].binary' "$MANIFEST")"
-  pre_start="$(yq -r --arg s "$svc_key" '.services[$s].pre_start // ""' "$MANIFEST")"
+  binary="$(svc="$svc_key" yq -r '.services[strenv(svc)].binary' "$MANIFEST")"
+  pre_start="$(svc="$svc_key" yq -r '.services[strenv(svc)].pre_start // ""' "$MANIFEST")"
 
   # /etc/alc-service@<binary>.env
   local env_block
-  env_block="$(yq -r --arg s "$svc_key" \
-    '.services[$s].env | to_entries | map("\(.key)=\(.value)") | .[]' "$MANIFEST")"
+  env_block="$(svc="$svc_key" yq -r \
+    '.services[strenv(svc)].env | to_entries | map("\(.key)=\(.value)") | .[]' "$MANIFEST")"
   printf '%s\n' "$env_block" \
     | incus exec "$instance" --project "$INCUS_PROJECT" -- \
         tee "/etc/alc-service@${binary}.env" >/dev/null

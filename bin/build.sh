@@ -121,7 +121,10 @@ build_args=(--release)
 if [[ -n "$BIN_FILTER" ]]; then
   build_args+=(--bin "$BIN_FILTER")
 else
-  build_args+=(--bins)
+  # workspace 内の全 member crate の binary を build。
+  # --bins だけだと root crate の bin (rust-alc-api/migrate/archive) しか作られず、
+  # crates/gateway / crates/tenko-api 等の binary が抜ける。
+  build_args+=(--workspace --bins)
 fi
 
 info "cargo build ${build_args[*]} (in $INCUS_PROJECT/$BUILDER_NAME)"
