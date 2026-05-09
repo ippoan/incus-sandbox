@@ -76,9 +76,11 @@ bash ~/git/incus-sandbox/bin/exec.sh rust-alc-api feat-foo backend -- \
   systemctl restart alc-service@rust-alc-api
 
 # 7. 終了
-bash ~/git/incus-sandbox/bin/down.sh rust-alc-api feat-foo            # DB 残す
-bash ~/git/incus-sandbox/bin/down.sh rust-alc-api feat-foo --purge    # DB volume も消す
+bash ~/git/incus-sandbox/bin/down.sh rust-alc-api feat-foo            # cargo target を残す
+bash ~/git/incus-sandbox/bin/down.sh rust-alc-api feat-foo --purge    # cargo target も消す (次回 cold build)
 ```
+
+postgres data は instance のエフェメラル FS に置くので、`down.sh` で常に揮発する (staging Cloud Run の emptyDir と同じ)。意図的にクリーン DB から始めたい時は何もしなくてよい。
 
 ### solo モード
 

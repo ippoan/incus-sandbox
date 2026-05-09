@@ -44,7 +44,7 @@ MANIFEST="$(manifest_path "$PROJECT")"
 WORKTREE_PATH="$(resolve_worktree_path "$PROJECT" "$WT")"
 INCUS_PROJECT="$(incus_project_name "$PROJECT" "$WT")"
 TARGET_VOLUME="$(target_volume_name "$PROJECT" "$WT")"
-PGDATA_VOLUME="$(pgdata_volume_name "$PROJECT" "$WT")"
+# postgres data は揮発 (instance のエフェメラル FS に置く)。staging と同じセマンティクス。
 
 # ---- resolve service list from mode ----
 case "$MODE" in
@@ -79,8 +79,6 @@ if ! incus_project_exists "$INCUS_PROJECT"; then
 fi
 incus_volume_exists default "$TARGET_VOLUME" \
   || incus storage volume create default "$TARGET_VOLUME" --type=filesystem
-incus_volume_exists default "$PGDATA_VOLUME" \
-  || incus storage volume create default "$PGDATA_VOLUME" --type=filesystem
 
 # ---- allocate host port ----
 HOST_PORT="$(port_alloc "$PROJECT" "$WT")"
@@ -113,14 +111,13 @@ ensure_postgres_instance() {
   if incus_instance_exists "$INCUS_PROJECT" "$name"; then
     return 0
   fi
-  info "init postgres from incus-dev-warm-pg"
+  info "init postgres from incus-dev-warm-pg (data is volatile)"
+  # postgres data は instance エフェメラル FS。down.sh で消えて毎回まっさら。
+  # staging の Cloud Run sidecar (emptyDir) と同じセマンティクス。
   incus init incus-dev-warm-pg "$name" \
     --project "$INCUS_PROJECT" \
     --profile default \
     --profile alc-base
-  incus config device add "$name" pgdata disk \
-    pool=default source="$PGDATA_VOLUME" path=/var/lib/postgresql/16/main \
-    --project "$INCUS_PROJECT" >/dev/null
 }
 
 start_instance() {

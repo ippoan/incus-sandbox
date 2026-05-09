@@ -23,13 +23,12 @@ binaries:
   - carins-api
   - dtako-api
 
-# postgres sidecar 設定
+# postgres sidecar 設定 (data は揮発、staging Cloud Run の emptyDir と同じ)
 postgres:
   warm_alias: incus-dev-warm-pg
   password: dev          # POSTGRES_HOST_AUTH_METHOD=trust なので実質使われない
   database: postgres
   schema: alc_api
-  data_volume_prefix: alc-pg-data   # 実 volume 名 = alc-pg-data-<worktree>
 
 # サービス定義
 services:

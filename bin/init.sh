@@ -122,9 +122,11 @@ build_warm_image() {
     incus delete -f "$tmp_name"
   fi
 
+  # alc-base を一緒に attach して NIC (alcbr0) を持たせる。
+  # cloud-init が apt install するため必須。
   incus launch "$base" "$tmp_name" \
     --config "user.user-data=$(cat "$cloud_init_file")" \
-    --profile default
+    --profile default --profile alc-base
 
   info "waiting for cloud-init in $tmp_name (this can take a few minutes)"
   local i=0
@@ -141,13 +143,14 @@ build_warm_image() {
   ok "warm image $alias ready"
 }
 
+# cloud 版 (`/cloud` suffix) は cloud-init を同梱する。minimal 版は cloud-init なし。
 build_warm_image incus-dev-warm \
-  images:ubuntu/24.04 \
+  images:ubuntu/noble/cloud \
   "${SANDBOX_ROOT}/cloud-init/ubuntu-app.yaml" \
   /var/lib/incus-sandbox-warm-ready
 
 build_warm_image incus-dev-warm-pg \
-  images:debian/12 \
+  images:debian/12/cloud \
   "${SANDBOX_ROOT}/cloud-init/debian-postgres.yaml" \
   /var/lib/incus-sandbox-warm-ready
 

@@ -56,10 +56,7 @@ target_volume_name() {
   printf 'cargo-target-%s-%s' "$(sanitize "$project")" "$(sanitize "$wt")"
 }
 
-pgdata_volume_name() {
-  local project="$1" wt="$2"
-  printf 'alc-pg-data-%s-%s' "$(sanitize "$project")" "$(sanitize "$wt")"
-}
+# (postgres data は揮発、専用 volume なし)
 
 # --- worktree resolution ---
 # Look up the on-disk path of a worktree using `git worktree list --porcelain`.

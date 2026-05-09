@@ -28,7 +28,6 @@ require_incus
 
 INCUS_PROJECT="$(incus_project_name "$PROJECT" "$WT")"
 TARGET_VOLUME="$(target_volume_name "$PROJECT" "$WT")"
-PGDATA_VOLUME="$(pgdata_volume_name "$PROJECT" "$WT")"
 
 if ! incus_project_exists "$INCUS_PROJECT"; then
   warn "project $INCUS_PROJECT does not exist, nothing to do"
@@ -45,23 +44,23 @@ case "$ACTION" in
     done
     ;;
   delete-instances)
+    # postgres data は instance と一緒に消える (揮発)。
+    # cargo target volume は残す (cold build を避けるため)。
     for i in "${INSTANCES[@]}"; do
       info "deleting $i"
       incus delete "$i" --project "$INCUS_PROJECT" --force || true
     done
-    ok "instances deleted, volumes & project preserved (use --purge to wipe)"
+    ok "instances deleted, cargo target volume preserved (use --purge to wipe target too)"
     ;;
   --purge)
     for i in "${INSTANCES[@]}"; do
       info "deleting $i"
       incus delete "$i" --project "$INCUS_PROJECT" --force || true
     done
-    for vol in "$TARGET_VOLUME" "$PGDATA_VOLUME"; do
-      if incus_volume_exists default "$vol"; then
-        info "deleting volume $vol"
-        incus storage volume delete default "$vol" || true
-      fi
-    done
+    if incus_volume_exists default "$TARGET_VOLUME"; then
+      info "deleting volume $TARGET_VOLUME"
+      incus storage volume delete default "$TARGET_VOLUME" || true
+    fi
     info "deleting project $INCUS_PROJECT"
     incus project delete "$INCUS_PROJECT" || true
     port_release "$PROJECT" "$WT"
