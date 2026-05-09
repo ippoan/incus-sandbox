@@ -96,10 +96,10 @@ ensure_app_instance() {
     --profile default \
     --profile alc-base
   incus config device add "$name" src disk \
-    source="$WORKTREE_PATH" path=/src \
+    source="$WORKTREE_PATH" path=/src shift=true \
     --project "$INCUS_PROJECT" >/dev/null
   incus config device add "$name" target disk \
-    pool=default source="$TARGET_VOLUME" path=/src/target \
+    pool=default source="$TARGET_VOLUME" path=/target \
     --project "$INCUS_PROJECT" >/dev/null
   incus config device add "$name" cargo-cache disk \
     pool=default source=cargo-registry path=/root/.cargo/registry \

@@ -87,12 +87,16 @@ if ! incus_instance_exists "$INCUS_PROJECT" "$BUILDER_NAME"; then
     --profile default \
     --profile alc-base
   # source bind-mount (host worktree)
+  # shift=true: Incus が UID を自動マップ (host yhonda ↔ container root) して
+  # コンテナ内 root が書ける状態にする。kernel 5.12+ の idmapped mounts 必須。
   incus config device add "$BUILDER_NAME" src disk \
-    source="$WORKTREE_PATH" path=/src \
+    source="$WORKTREE_PATH" path=/src shift=true \
     --project "$INCUS_PROJECT" >/dev/null
   # cargo target volume
+  # cargo target は /target に分離 (worktree の /src と被らせない、LXC の
+  # rootfs 上の bind-mount + overlay を避ける)。CARGO_TARGET_DIR で誘導する。
   incus config device add "$BUILDER_NAME" target disk \
-    pool=default source="$TARGET_VOLUME" path=/src/target \
+    pool=default source="$TARGET_VOLUME" path=/target \
     --project "$INCUS_PROJECT" >/dev/null
   # shared cargo registry
   incus config device add "$BUILDER_NAME" cargo-cache disk \
@@ -119,13 +123,14 @@ fi
 info "cargo build ${build_args[*]} (in $INCUS_PROJECT/$BUILDER_NAME)"
 incus exec "$BUILDER_NAME" --project "$INCUS_PROJECT" \
   --env CARGO_HOME=/root/.cargo \
+  --env CARGO_TARGET_DIR=/target \
   --env PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
   --cwd /src \
   -- bash -lc "cargo build ${build_args[*]}"
 
 ok "build done"
 incus exec "$BUILDER_NAME" --project "$INCUS_PROJECT" -- \
-  bash -lc 'ls -la /src/target/release/ 2>/dev/null | grep -E "^-.+x" | awk "{print \$NF}" | head -20' || true
+  bash -lc 'ls -la /target/release/ 2>/dev/null | grep -E "^-.+x" | awk "{print \$NF}" | head -20' || true
 
 if [[ "$KEEP" -eq 0 ]]; then
   info "stopping builder (--stop)"
