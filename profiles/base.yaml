@@ -1,0 +1,17 @@
+# alc-base: 全 instance 共通の最小設定
+# - bridge alcbr0 接続
+# - systemd を中で動かすための security 設定
+# - Incus 内 DNS で <name>.incus 解決
+name: alc-base
+description: incus-sandbox base profile (network, systemd, dns)
+config:
+  security.nesting: "true"
+  security.privileged: "false"
+  # systemd を init として起動するために必要
+  raw.lxc: |
+    lxc.init.cmd = /sbin/init
+devices:
+  eth0:
+    type: nic
+    network: alcbr0
+    name: eth0

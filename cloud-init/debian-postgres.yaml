@@ -1,0 +1,74 @@
+#cloud-config
+# warm image (incus-dev-warm-pg) 作成時に 1 度だけ走る。
+# postgresql-16 をインストールしてサンドボックスの sidecar として常駐させる。
+# 実データは Incus volume `alc-pg-data-<worktree>` を /var/lib/postgresql/16/main にマウントする。
+
+package_update: true
+
+apt:
+  sources:
+    pgdg:
+      source: "deb http://apt.postgresql.org/pub/repos/apt bookworm-pgdg main"
+      keyid: B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8
+
+packages:
+  - postgresql-16
+  - postgresql-client-16
+  - postgresql-contrib-16
+  - ca-certificates
+  - curl
+  - vim
+  - less
+  - jq
+  - net-tools
+  - systemd
+  - systemd-sysv
+  - dbus
+
+write_files:
+  # 全ホストから接続を受け付ける (Incus 内の DNS 名 postgres.incus 越しに各 service が来る)
+  - path: /etc/postgresql/16/main/conf.d/10-listen.conf
+    content: |
+      listen_addresses = '*'
+      port = 5432
+      max_connections = 200
+      shared_buffers = 128MB
+    permissions: '0644'
+    owner: postgres:postgres
+
+  # Incus 内 bridge (10.x.x.x) からの接続を trust に
+  - path: /etc/postgresql/16/main/conf.d/20-pg_hba_dev.conf
+    content: |
+      # incus dev sandbox: Incus bridge からは trust
+      # 注意: 本番は絶対こうしない
+    permissions: '0644'
+    owner: postgres:postgres
+
+  # 起動完了マーカー
+  - path: /usr/local/bin/incus-sandbox-pg-ready.sh
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -e
+      until pg_isready -h /var/run/postgresql -U postgres >/dev/null 2>&1; do
+        sleep 1
+      done
+      touch /var/lib/incus-sandbox-pg-warm-ready
+
+runcmd:
+  # pg_hba.conf に dev 用 trust 行を追加 (Incus bridge は 10.0.0.0/8 想定)
+  - |
+    cat >>/etc/postgresql/16/main/pg_hba.conf <<'EOF'
+
+    # incus-sandbox dev: bridge 内 trust
+    host    all             all             10.0.0.0/8              trust
+    host    all             all             172.16.0.0/12           trust
+    host    all             all             192.168.0.0/16          trust
+    EOF
+  - systemctl enable postgresql
+  - systemctl start postgresql
+  - /usr/local/bin/incus-sandbox-pg-ready.sh
+  - touch /var/lib/incus-sandbox-warm-ready
+
+locale: C.UTF-8
+timezone: Asia/Tokyo

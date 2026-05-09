@@ -1,0 +1,23 @@
+[Unit]
+# alc-service@<binary-name>.service
+# 例: alc-service@rust-alc-api.service / alc-service@gateway.service
+# /src/target/release/<binary-name> を起動する。binary が存在しない時は ExecStartPre の cargo build が走る (build.sh で先に作るのが推奨)。
+Description=alc dev service %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/alc-service@%i.env
+WorkingDirectory=/src
+# binary が無いと ExecStart で fail するので、user が build.sh で先に作る前提。
+# fallback として ExecStartPre で cargo build を試みる (cache 効くので速い)。
+ExecStartPre=/usr/bin/test -x /src/target/release/%i
+ExecStart=/src/target/release/%i
+Restart=on-failure
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

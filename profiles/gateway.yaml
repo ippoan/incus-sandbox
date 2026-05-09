@@ -1,0 +1,27 @@
+# alc-gateway: gateway instance 用
+# - alc-app と同じ bind-mount 構成
+# - 加えて host port 18080+N を gateway:8080 に proxy する device を up.sh で後付け
+# - proxy device は worktree ごとに port が違うため manifest だけでは固定できず、
+#   up.sh が `incus config device add gateway gw-listen proxy ...` で動的に追加する
+name: alc-gateway
+description: incus-sandbox gateway profile (host port forwarding via proxy device)
+config:
+  environment.RUST_LOG: "gateway=info,tower_http=info"
+  environment.CARGO_HOME: /root/.cargo
+  environment.PATH: /root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+devices:
+  src:
+    type: disk
+    source: PLACEHOLDER_WORKTREE_PATH
+    path: /src
+    readonly: "false"
+  target:
+    type: disk
+    pool: default
+    source: PLACEHOLDER_TARGET_VOLUME
+    path: /src/target
+  cargo-cache:
+    type: disk
+    pool: default
+    source: cargo-registry
+    path: /root/.cargo/registry

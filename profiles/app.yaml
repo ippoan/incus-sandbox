@@ -1,0 +1,31 @@
+# alc-app: Rust binary を動かす instance 用
+# - /src に worktree を bind-mount (read-write)
+# - /src/target は worktree 専用 volume で上書き (host worktree を汚さない)
+# - /root/.cargo/registry を共有 volume で全 worktree 共通キャッシュ
+# - up.sh が worktree ごとに volume 名を差し込んで profile を生成する
+name: alc-app
+description: incus-sandbox app profile (rust binary host with bind-mounted source)
+config:
+  environment.RUST_LOG: info
+  environment.CARGO_HOME: /root/.cargo
+  environment.PATH: /root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+devices:
+  # source bind-mount。実体パスは up.sh が `incus config device add` で個別に注入する
+  # ここでは placeholder として宣言だけ
+  src:
+    type: disk
+    source: PLACEHOLDER_WORKTREE_PATH
+    path: /src
+    readonly: "false"
+  # target volume (worktree ごと)。volume 名 cargo-target-<wt> も up.sh が注入
+  target:
+    type: disk
+    pool: default
+    source: PLACEHOLDER_TARGET_VOLUME
+    path: /src/target
+  # cargo registry (全 worktree 共通)
+  cargo-cache:
+    type: disk
+    pool: default
+    source: cargo-registry
+    path: /root/.cargo/registry

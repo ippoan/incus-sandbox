@@ -1,0 +1,76 @@
+#cloud-config
+# warm image (incus-dev-warm) 作成時に 1 度だけ走る。
+# rust binary を実行する Incus instance のベースになる。
+# rustup + 開発 / デバッグツール一式を入れた状態で snapshot される。
+
+package_update: true
+package_upgrade: false
+
+packages:
+  # build toolchain (cargo build をコンテナ内で走らせる用)
+  - build-essential
+  - pkg-config
+  - libssl-dev
+  - clang
+  - lld
+  # network / debug
+  - ca-certificates
+  - curl
+  - wget
+  - dnsutils
+  - iputils-ping
+  - net-tools
+  - strace
+  - ltrace
+  - tcpdump
+  - lsof
+  # text / shell
+  - vim
+  - less
+  - tmux
+  - htop
+  - jq
+  - ripgrep
+  - file
+  - tree
+  - unzip
+  # postgres client (psql で postgres.incus を叩く用)
+  - postgresql-client
+  # systemd in container 必須
+  - systemd
+  - systemd-sysv
+  - dbus
+  # git (worktree のソースを Incus 内から見る場合に便利)
+  - git
+
+runcmd:
+  # rustup を root で導入。/root/.cargo/bin に PATH を通す。
+  # Incus volume `cargo-registry` を /root/.cargo/registry にマウントするので、
+  # rustup 自身は /root/.rustup に入って image snapshot に焼かれる。
+  - |
+    if ! command -v rustup >/dev/null 2>&1; then
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+        | sh -s -- -y --default-toolchain stable --profile minimal
+    fi
+  - mkdir -p /etc/profile.d
+  - |
+    cat >/etc/profile.d/rust.sh <<'EOF'
+    export PATH="/root/.cargo/bin:$PATH"
+    export CARGO_HOME=/root/.cargo
+    EOF
+  - chmod 0644 /etc/profile.d/rust.sh
+  # systemd で /src/target/release/<bin> を動かすので /usr/local/bin に PATH 通す
+  - mkdir -p /etc/systemd/system
+  # cloud-init 完了マーカー (init.sh の publish 判断用)
+  - touch /var/lib/incus-sandbox-warm-ready
+
+write_files:
+  - path: /etc/sysctl.d/90-incus-app.conf
+    content: |
+      # 開発用、特に厳しくしない
+      net.ipv4.ip_forward=0
+    permissions: '0644'
+
+# locale
+locale: C.UTF-8
+timezone: Asia/Tokyo

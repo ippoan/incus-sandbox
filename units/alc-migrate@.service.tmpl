@@ -1,0 +1,21 @@
+[Unit]
+# alc-migrate@<binary-name>.service
+# alc-service@<binary> の前に走らせて DB migrate を確実に通す。
+# backend / tenko / carins / dtako / trouble の起動前に 1 回だけ実行。
+Description=alc dev migrate (before %i)
+After=network-online.target
+Wants=network-online.target
+Before=alc-service@%i.service
+RequiredBy=alc-service@%i.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/alc-service@%i.env
+WorkingDirectory=/src
+ExecStart=/src/target/release/migrate
+RemainAfterExit=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

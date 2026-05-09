@@ -1,0 +1,98 @@
+# rust-alc-api 用 manifest
+# staging/cloudrun-staging.yaml を正本に手動転記。
+# DATABASE_URL の host は localhost → postgres.incus に書き換え、
+# password も staging の値ではなく dev 固定 ("dev") を使う。
+# Secret Manager からの注入は Incus では行わず、worktree 直下の .env.local を
+# up.sh が読んで /etc/alc-service@<bin>.env に追記する (任意)。
+
+project: rust-alc-api
+
+# worktree の探索ルート (CLI で --worktree-root で上書き可)
+worktree_root: ~/rust/rust-alc-api/.claude/worktrees
+
+# host worktree の中で参照するパス (postgres init 用)
+init_sql_path: scripts/init_local_db.sql
+
+# cargo build --release --bins で生える binary 一覧。build.sh が参照する。
+binaries:
+  - rust-alc-api    # = backend
+  - migrate
+  - archive
+  - gateway
+  - tenko-api
+  - carins-api
+  - dtako-api
+
+# postgres sidecar 設定
+postgres:
+  warm_alias: incus-dev-warm-pg
+  password: dev          # POSTGRES_HOST_AUTH_METHOD=trust なので実質使われない
+  database: postgres
+  schema: alc_api
+  data_volume_prefix: alc-pg-data   # 実 volume 名 = alc-pg-data-<worktree>
+
+# サービス定義
+services:
+  backend:
+    binary: rust-alc-api
+    pre_start: migrate
+    port: 8081
+    depends_on: [postgres]
+    env:
+      PORT: "8081"
+      DATABASE_URL: "postgresql://postgres:dev@postgres.incus:5432/postgres?options=-c search_path=alc_api"
+      RUST_LOG: "info"
+      STAGING_MODE: "true"
+      # Secret は dev では空文字列 / 適当値で起動可能なものだけ設定
+      # (R2 等の外部 IO は失敗するが本筋に影響しない)
+
+  tenko:
+    binary: tenko-api
+    pre_start: migrate
+    port: 8082
+    depends_on: [postgres]
+    env:
+      PORT: "8082"
+      DATABASE_URL: "postgresql://postgres:dev@postgres.incus:5432/postgres?options=-c search_path=alc_api"
+      RUST_LOG: "tenko_api=info"
+
+  carins:
+    binary: carins-api
+    pre_start: migrate
+    port: 8083
+    depends_on: [postgres]
+    env:
+      PORT: "8083"
+      DATABASE_URL: "postgresql://postgres:dev@postgres.incus:5432/postgres?options=-c search_path=alc_api"
+      RUST_LOG: "carins_api=info"
+
+  dtako:
+    binary: dtako-api
+    pre_start: migrate
+    port: 8084
+    depends_on: [postgres]
+    env:
+      PORT: "8084"
+      DATABASE_URL: "postgresql://postgres:dev@postgres.incus:5432/postgres?options=-c search_path=alc_api"
+      RUST_LOG: "dtako_api=info"
+
+  gateway:
+    binary: gateway
+    port: 8080
+    depends_on: [backend, tenko, carins, dtako]
+    expose_to_host: true   # host 127.0.0.1:<allocated-port> → gateway:8080 の proxy device を作る
+    env:
+      BACKEND_URL: "http://backend.incus:8081"
+      TENKO_API_URL: "http://tenko.incus:8082"
+      CARINS_API_URL: "http://carins.incus:8083"
+      DTAKO_API_URL: "http://dtako.incus:8084"
+      RUST_LOG: "gateway=info,tower_http=info"
+
+# 起動モード
+modes:
+  solo:
+    description: "<service> + postgres + gateway"
+    instances: [postgres, "<arg>", gateway]
+  full:
+    description: "全 service + postgres + gateway (staging 相当)"
+    instances: [postgres, backend, tenko, carins, dtako, gateway]
