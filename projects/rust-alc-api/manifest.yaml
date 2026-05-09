@@ -38,12 +38,32 @@ services:
     port: 8081
     depends_on: [postgres]
     env:
+      # 共通
       PORT: "8081"
       DATABASE_URL: "postgresql://postgres:dev@postgres.incus:5432/postgres?options=-c search_path=alc_api"
       RUST_LOG: "info"
       STAGING_MODE: "true"
-      # Secret は dev では空文字列 / 適当値で起動可能なものだけ設定
-      # (R2 等の外部 IO は失敗するが本筋に影響しない)
+      # 本番 Secret 相当 (dev はダミー値で OK、外部 IO は失敗するが起動は通る)
+      JWT_SECRET: "dev-jwt-secret-32chars-min-aaaaaaaa"
+      GOOGLE_CLIENT_ID: "dev-google-client-id.apps.googleusercontent.com"
+      GOOGLE_CLIENT_SECRET: "dev-google-client-secret"
+      OAUTH_STATE_SECRET: "dev-oauth-state-secret-32chars-aaaa"
+      # R2 / GCS storage は dev では使わない (face-photos / carins / dtako)
+      STORAGE_BACKEND: "r2"
+      R2_BUCKET: "dev-alc-face-photos"
+      R2_ACCOUNT_ID: "dev"
+      R2_ACCESS_KEY: "dev"
+      R2_SECRET_KEY: "dev"
+      CARINS_R2_BUCKET: "dev-carins"
+      CARINS_R2_ACCESS_KEY: "dev"
+      CARINS_R2_SECRET_KEY: "dev"
+      DTAKO_R2_BUCKET: "dev-dtako"
+      DTAKO_R2_ACCESS_KEY: "dev"
+      DTAKO_R2_SECRET_KEY: "dev"
+      API_ORIGIN: "http://127.0.0.1:18080"
+      FCM_PROJECT_ID: "dev"
+      LINE_LOGIN_CHANNEL_ID: "dev"
+      LINE_LOGIN_CHANNEL_SECRET: "dev"
 
   tenko:
     binary: tenko-api
@@ -54,6 +74,7 @@ services:
       PORT: "8082"
       DATABASE_URL: "postgresql://postgres:dev@postgres.incus:5432/postgres?options=-c search_path=alc_api"
       RUST_LOG: "tenko_api=info"
+      JWT_SECRET: "dev-jwt-secret-32chars-min-aaaaaaaa"
 
   carins:
     binary: carins-api
@@ -64,6 +85,12 @@ services:
       PORT: "8083"
       DATABASE_URL: "postgresql://postgres:dev@postgres.incus:5432/postgres?options=-c search_path=alc_api"
       RUST_LOG: "carins_api=info"
+      JWT_SECRET: "dev-jwt-secret-32chars-min-aaaaaaaa"
+      STORAGE_BACKEND: "r2"
+      CARINS_R2_BUCKET: "dev-carins"
+      CARINS_R2_ACCOUNT_ID: "dev"
+      CARINS_R2_ACCESS_KEY: "dev"
+      CARINS_R2_SECRET_KEY: "dev"
 
   dtako:
     binary: dtako-api
@@ -74,6 +101,12 @@ services:
       PORT: "8084"
       DATABASE_URL: "postgresql://postgres:dev@postgres.incus:5432/postgres?options=-c search_path=alc_api"
       RUST_LOG: "dtako_api=info"
+      JWT_SECRET: "dev-jwt-secret-32chars-min-aaaaaaaa"
+      STORAGE_BACKEND: "r2"
+      DTAKO_R2_BUCKET: "dev-dtako"
+      DTAKO_R2_ACCOUNT_ID: "dev"
+      DTAKO_R2_ACCESS_KEY: "dev"
+      DTAKO_R2_SECRET_KEY: "dev"
 
   gateway:
     binary: gateway
@@ -86,6 +119,7 @@ services:
       CARINS_API_URL: "http://carins.incus:8083"
       DTAKO_API_URL: "http://dtako.incus:8084"
       RUST_LOG: "gateway=info,tower_http=info"
+      JWT_SECRET: "dev-jwt-secret-32chars-min-aaaaaaaa"
 
 # 起動モード
 modes:

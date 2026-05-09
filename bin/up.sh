@@ -172,7 +172,25 @@ for svc in "${SERVICES[@]}"; do
     postgres)
       ensure_postgres_instance
       start_instance postgres
-      # postgres は cloud-init で自動起動するので追加 unit 不要
+      # postgres は cloud-init で自動起動。init SQL 流し込みのみ追加。
+      info "applying init SQL to postgres (idempotent)"
+      local init_sql_rel
+      init_sql_rel="$(yq -r '.init_sql_path // "scripts/init_local_db.sql"' "$MANIFEST")"
+      local init_sql_host="${WORKTREE_PATH}/${init_sql_rel}"
+      if [[ -f "$init_sql_host" ]]; then
+        # postgres ready まで待つ + psql で流す
+        for i in 1 2 3 4 5 6 7 8 9 10; do
+          incus exec postgres --project "$INCUS_PROJECT" -- pg_isready -h /var/run/postgresql -U postgres >/dev/null 2>&1 && break
+          sleep 1
+        done
+        incus file push --project "$INCUS_PROJECT" \
+          "$init_sql_host" postgres/tmp/init_local_db.sql --mode 0644
+        incus exec postgres --project "$INCUS_PROJECT" -- \
+          su -c "psql -U postgres -f /tmp/init_local_db.sql" postgres >/dev/null 2>&1 \
+          || warn "init SQL had errors (likely idempotent re-run)"
+      else
+        warn "init SQL not found at $init_sql_host"
+      fi
       ;;
     gateway)
       ensure_app_instance gateway incus-dev-warm
