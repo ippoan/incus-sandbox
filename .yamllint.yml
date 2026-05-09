@@ -1,0 +1,14 @@
+extends: default
+rules:
+  line-length:
+    max: 200
+  document-start: disable
+  indentation:
+    spaces: 2
+    indent-sequences: consistent
+  comments-indentation: disable
+  # cloud-init の `#cloud-config` ヘッダーが「コメント前の空白なし」で正規なため
+  comments: disable
+  # GitHub Actions の `on:` キーワードを truthy 扱いさせない
+  truthy:
+    allowed-values: ['true', 'false', 'on']
