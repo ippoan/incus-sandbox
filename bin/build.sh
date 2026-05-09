@@ -130,7 +130,6 @@ incus exec "$BUILDER_NAME" --project "$INCUS_PROJECT" \
   --env CARGO_TARGET_DIR=/target \
   --env RUSTC_WRAPPER=sccache \
   --env SCCACHE_DIR=/sccache \
-  --env PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
   --cwd /src \
   -- bash -lc "cargo build ${build_args[*]}"
 

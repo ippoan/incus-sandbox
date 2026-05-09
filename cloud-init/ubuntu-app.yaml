@@ -69,15 +69,17 @@ runcmd:
     mkdir -p /cache/rustup
     cp -a /root/.rustup/. /cache/rustup/ 2>/dev/null || true
   - |
+    # apt 版 rustup の cargo/rustc proxy は /usr/bin/ にある (rustup が
+    # /root/.cargo/bin/ を作らない設計)。CARGO_HOME はデータ置き場として
+    # /root/.cargo を維持 (registry volume が /root/.cargo/registry に来る)。
     cat >/etc/profile.d/rust.sh <<'EOF'
-    export PATH="/root/.cargo/bin:$PATH"
     export CARGO_HOME=/root/.cargo
     export RUSTC_WRAPPER=sccache
     export SCCACHE_DIR=/sccache
     EOF
   - chmod 0644 /etc/profile.d/rust.sh
-  # cloud-init 完了マーカー — rustup 成功時のみ touch (失敗を検知できるように)
-  - test -x /root/.cargo/bin/cargo && touch /var/lib/incus-sandbox-warm-ready
+  # cloud-init 完了マーカー — cargo が呼べる時のみ touch
+  - command -v cargo >/dev/null && touch /var/lib/incus-sandbox-warm-ready
 
 write_files:
   - path: /etc/sysctl.d/90-incus-app.conf
