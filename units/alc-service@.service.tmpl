@@ -4,8 +4,10 @@
 # /target/release/<binary-name> を起動する。/target は cargo target volume が
 # mount される場所 (build.sh が CARGO_TARGET_DIR=/target で書き込む)。
 Description=alc dev service %i
-After=network-online.target
+After=network-online.target alc-migrate@%i.service
 Wants=network-online.target
+# alc-migrate@ がある時は先に成功させる (oneshot なので restart 時も再実行される)
+Wants=alc-migrate@%i.service
 
 [Service]
 Type=simple
