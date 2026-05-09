@@ -137,8 +137,7 @@ incus-sandbox/
 ├── profiles/                 # Incus profile YAML
 ├── units/                    # systemd unit テンプレ
 ├── projects/<name>/          # プロジェクト別 manifest
-├── allocations/ports.json    # worktree → host port 割当 (gitignore)
-└── .github/workflows/        # CI (shellcheck + yamllint)
+└── allocations/ports.json    # worktree → host port 割当 (gitignore)
 ```
 
 ## 設計メモ
