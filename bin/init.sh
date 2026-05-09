@@ -37,6 +37,7 @@ apt-get update -qq
 install_pkg incus
 install_pkg jq
 install_pkg git
+install_pkg iptables-persistent
 
 # yq mikefarah v4: not in apt as that name; use snap or download.
 # apt の "yq" は python-yq で文法が違う。明示的に mikefarah 版を入れる。
@@ -83,6 +84,25 @@ else
   ok "network alcbr0 exists"
 fi
 
+# Docker と Incus の iptables 共存対策。
+# Docker が FORWARD policy=DROP にするため、alcbr0 の outbound (apt/curl 等) が
+# 全部 drop される。DOCKER-USER に明示的 ACCEPT を入れて永続化。
+if iptables -L DOCKER-USER -n >/dev/null 2>&1; then
+  added=0
+  for direction in i o; do
+    if ! iptables -C DOCKER-USER -${direction} alcbr0 -j ACCEPT 2>/dev/null; then
+      iptables -I DOCKER-USER -${direction} alcbr0 -j ACCEPT
+      added=1
+    fi
+  done
+  if [[ $added -eq 1 ]]; then
+    info "added iptables DOCKER-USER ACCEPT rules for alcbr0"
+    netfilter-persistent save >/dev/null 2>&1 || true
+  else
+    ok "iptables DOCKER-USER rules already present"
+  fi
+fi
+
 # ---- 5. profiles ----
 load_profile() {
   local name="$1" file="$2"
@@ -101,17 +121,21 @@ load_profile alc-app      "${SANDBOX_ROOT}/profiles/app.yaml"
 load_profile alc-postgres "${SANDBOX_ROOT}/profiles/postgres.yaml"
 load_profile alc-gateway  "${SANDBOX_ROOT}/profiles/gateway.yaml"
 
-# ---- 6. cargo-registry shared volume ----
-if ! incus_volume_exists default cargo-registry; then
-  info "creating shared volume cargo-registry"
-  incus storage volume create default cargo-registry --type=filesystem
-else
-  ok "volume cargo-registry exists"
-fi
+# ---- 6. shared cache volumes ----
+# 全 worktree / 全 warm image build で使い回す cache 群。
+for vol in cargo-registry sccache-cache apt-cache rustup-cache; do
+  if ! incus_volume_exists default "$vol"; then
+    info "creating shared volume $vol"
+    incus storage volume create default "$vol" --type=filesystem
+  else
+    ok "volume $vol exists"
+  fi
+done
 
 # ---- 7,8. warm images ----
 build_warm_image() {
   local alias="$1" base="$2" cloud_init_file="$3" marker="$4"
+  local mount_caches="${5:-yes}"   # apt + rustup cache を attach するか (Ubuntu のみ yes)
   if incus_image_alias_exists "$alias"; then
     ok "warm image $alias exists, skipping (delete it to rebuild)"
     return 0
@@ -122,11 +146,22 @@ build_warm_image() {
     incus delete -f "$tmp_name"
   fi
 
-  # alc-base を一緒に attach して NIC (alcbr0) を持たせる。
-  # cloud-init が apt install するため必須。
-  incus launch "$base" "$tmp_name" \
+  # init (start しない)、cache device を attach してから start する。
+  incus init "$base" "$tmp_name" \
     --config "user.user-data=$(cat "$cloud_init_file")" \
     --profile default --profile alc-base
+
+  if [[ "$mount_caches" == "yes" ]]; then
+    # apt cache: /var/cache/apt/archives を shared volume に
+    incus config device add "$tmp_name" apt-cache disk \
+      pool=default source=apt-cache path=/var/cache/apt/archives >/dev/null
+    # rustup toolchain cache: /cache/rustup を shared volume に。
+    # cloud-init runcmd で /root/.rustup ↔ /cache/rustup を相互コピーする。
+    incus config device add "$tmp_name" rustup-cache disk \
+      pool=default source=rustup-cache path=/cache/rustup >/dev/null
+  fi
+
+  incus start "$tmp_name"
 
   info "waiting for cloud-init in $tmp_name (this can take a few minutes)"
   local i=0
@@ -138,20 +173,29 @@ build_warm_image() {
 
   info "stopping $tmp_name and publishing as $alias"
   incus stop "$tmp_name"
+  # publish 前に cache device を外す (image rootfs に余計な mount 情報を残さない)
+  for dev in apt-cache rustup-cache; do
+    incus config device remove "$tmp_name" "$dev" 2>/dev/null || true
+  done
   incus publish "$tmp_name" --alias "$alias"
   incus delete "$tmp_name"
   ok "warm image $alias ready"
 }
 
 # cloud 版 (`/cloud` suffix) は cloud-init を同梱する。minimal 版は cloud-init なし。
+# Ubuntu 側は apt + rustup cache を活用するので mount_caches=yes
 build_warm_image incus-dev-warm \
   images:ubuntu/noble/cloud \
   "${SANDBOX_ROOT}/cloud-init/ubuntu-app.yaml" \
-  /var/lib/incus-sandbox-warm-ready
+  /var/lib/incus-sandbox-warm-ready \
+  yes
 
+# Debian/postgres は apt しか使わないので apt-cache だけでも嬉しいが、
+# 構造保ちつつ no にして簡素化 (postgres は再 build 頻度が低い)
 build_warm_image incus-dev-warm-pg \
   images:debian/12/cloud \
   "${SANDBOX_ROOT}/cloud-init/debian-postgres.yaml" \
-  /var/lib/incus-sandbox-warm-ready
+  /var/lib/incus-sandbox-warm-ready \
+  no
 
 ok "init complete. next: bash bin/build.sh <project> <worktree-name>"

@@ -102,6 +102,10 @@ if ! incus_instance_exists "$INCUS_PROJECT" "$BUILDER_NAME"; then
   incus config device add "$BUILDER_NAME" cargo-cache disk \
     pool=default source=cargo-registry path=/root/.cargo/registry \
     --project "$INCUS_PROJECT" >/dev/null
+  # sccache 共有 cache (全 worktree で hit させる)
+  incus config device add "$BUILDER_NAME" sccache disk \
+    pool=default source=sccache-cache path=/sccache \
+    --project "$INCUS_PROJECT" >/dev/null
   incus start "$BUILDER_NAME" --project "$INCUS_PROJECT"
   wait_for_cloud_init "$INCUS_PROJECT" "$BUILDER_NAME"
 else
@@ -124,11 +128,15 @@ info "cargo build ${build_args[*]} (in $INCUS_PROJECT/$BUILDER_NAME)"
 incus exec "$BUILDER_NAME" --project "$INCUS_PROJECT" \
   --env CARGO_HOME=/root/.cargo \
   --env CARGO_TARGET_DIR=/target \
+  --env RUSTC_WRAPPER=sccache \
+  --env SCCACHE_DIR=/sccache \
   --env PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
   --cwd /src \
   -- bash -lc "cargo build ${build_args[*]}"
 
 ok "build done"
+incus exec "$BUILDER_NAME" --project "$INCUS_PROJECT" -- \
+  bash -lc 'sccache --show-stats 2>/dev/null | head -20' || true
 incus exec "$BUILDER_NAME" --project "$INCUS_PROJECT" -- \
   bash -lc 'ls -la /target/release/ 2>/dev/null | grep -E "^-.+x" | awk "{print \$NF}" | head -20' || true
 

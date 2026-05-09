@@ -42,27 +42,42 @@ packages:
   - dbus
   # git (worktree のソースを Incus 内から見る場合に便利)
   - git
+  # Rust toolchain installer
+  - rustup
+  # sccache: 全 worktree 横断 cache (warm image にバイナリを焼き込む)
+  - sccache
 
 runcmd:
-  # rustup を root で導入。/root/.cargo/bin に PATH を通す。
-  # Incus volume `cargo-registry` を /root/.cargo/registry にマウントするので、
-  # rustup 自身は /root/.rustup に入って image snapshot に焼かれる。
+  # rustup cache restore: 過去の warm image build で /cache/rustup に保存された
+  # toolchain 一式があれば、/root/.rustup に複製してから rustup default stable を呼ぶ
+  # (rustup は既にインストール済みと判定して download をスキップする)
   - |
-    if ! command -v rustup >/dev/null 2>&1; then
-      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-        | sh -s -- -y --default-toolchain stable --profile minimal
+    if [ -d /cache/rustup ] && [ -n "$(ls -A /cache/rustup 2>/dev/null)" ]; then
+      mkdir -p /root/.rustup
+      cp -a /cache/rustup/. /root/.rustup/
+      echo "rustup cache restored from /cache/rustup"
     fi
-  - mkdir -p /etc/profile.d
+  - |
+    for i in 1 2 3; do
+      HOME=/root rustup default stable && break
+      echo "rustup default stable failed (attempt $i), retrying..."
+      sleep 5
+    done
+  # cache write-back: 今回 download/install した toolchain を /cache/rustup に保存
+  # (次回 warm image rebuild 時に上の restore で再利用される)
+  - |
+    mkdir -p /cache/rustup
+    cp -a /root/.rustup/. /cache/rustup/ 2>/dev/null || true
   - |
     cat >/etc/profile.d/rust.sh <<'EOF'
     export PATH="/root/.cargo/bin:$PATH"
     export CARGO_HOME=/root/.cargo
+    export RUSTC_WRAPPER=sccache
+    export SCCACHE_DIR=/sccache
     EOF
   - chmod 0644 /etc/profile.d/rust.sh
-  # systemd で /src/target/release/<bin> を動かすので /usr/local/bin に PATH 通す
-  - mkdir -p /etc/systemd/system
-  # cloud-init 完了マーカー (init.sh の publish 判断用)
-  - touch /var/lib/incus-sandbox-warm-ready
+  # cloud-init 完了マーカー — rustup 成功時のみ touch (失敗を検知できるように)
+  - test -x /root/.cargo/bin/cargo && touch /var/lib/incus-sandbox-warm-ready
 
 write_files:
   - path: /etc/sysctl.d/90-incus-app.conf
