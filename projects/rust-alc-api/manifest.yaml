@@ -44,7 +44,7 @@ services:
       RUST_LOG: "info"
       STAGING_MODE: "true"
       # 本番 Secret 相当 (dev はダミー値で OK、外部 IO は失敗するが起動は通る)
-      JWT_SECRET: "dev-jwt-secret-32chars-min-aaaaaaaa"
+      JWT_SECRET: "rust-logi-jwt-secret-prod-2026"
       GOOGLE_CLIENT_ID: "dev-google-client-id.apps.googleusercontent.com"
       GOOGLE_CLIENT_SECRET: "dev-google-client-secret"
       OAUTH_STATE_SECRET: "dev-oauth-state-secret-32chars-aaaa"
@@ -74,7 +74,7 @@ services:
       PORT: "8082"
       DATABASE_URL: "postgresql://postgres:dev@postgres.incus:5432/postgres?options=-c search_path=alc_api"
       RUST_LOG: "tenko_api=info"
-      JWT_SECRET: "dev-jwt-secret-32chars-min-aaaaaaaa"
+      JWT_SECRET: "rust-logi-jwt-secret-prod-2026"
 
   carins:
     binary: carins-api
@@ -85,7 +85,7 @@ services:
       PORT: "8083"
       DATABASE_URL: "postgresql://postgres:dev@postgres.incus:5432/postgres?options=-c search_path=alc_api"
       RUST_LOG: "carins_api=info"
-      JWT_SECRET: "dev-jwt-secret-32chars-min-aaaaaaaa"
+      JWT_SECRET: "rust-logi-jwt-secret-prod-2026"
       STORAGE_BACKEND: "r2"
       CARINS_R2_BUCKET: "dev-carins"
       CARINS_R2_ACCOUNT_ID: "dev"
@@ -101,7 +101,7 @@ services:
       PORT: "8084"
       DATABASE_URL: "postgresql://postgres:dev@postgres.incus:5432/postgres?options=-c search_path=alc_api"
       RUST_LOG: "dtako_api=info"
-      JWT_SECRET: "dev-jwt-secret-32chars-min-aaaaaaaa"
+      JWT_SECRET: "rust-logi-jwt-secret-prod-2026"
       STORAGE_BACKEND: "r2"
       DTAKO_R2_BUCKET: "dev-dtako"
       DTAKO_R2_ACCOUNT_ID: "dev"
@@ -119,7 +119,7 @@ services:
       CARINS_API_URL: "http://carins.incus:8083"
       DTAKO_API_URL: "http://dtako.incus:8084"
       RUST_LOG: "gateway=info,tower_http=info"
-      JWT_SECRET: "dev-jwt-secret-32chars-min-aaaaaaaa"
+      JWT_SECRET: "rust-logi-jwt-secret-prod-2026"
 
 # 起動モード
 modes:
