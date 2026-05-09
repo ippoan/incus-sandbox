@@ -51,12 +51,14 @@ fi
 
 ok "tools ready: $(incus --version) / $(yq --version) / jq $(jq --version | tr -d '\n')"
 
-# ---- 2. incus admin init ----
-if ! incus info >/dev/null 2>&1; then
-  info "incus admin init --minimal"
+# ---- 2. incus admin init / default storage pool ----
+# `incus info` が通っても storage pool が未作成のことがある (apt install 直後)。
+# pool が無ければ minimal init を走らせる。
+if ! incus storage list --format=csv 2>/dev/null | grep -q '^default,'; then
+  info "running incus admin init --minimal (no default storage pool found)"
   incus admin init --minimal
 else
-  ok "incus already initialised"
+  ok "incus initialised (default storage pool present)"
 fi
 
 # ---- 3. user group ----
