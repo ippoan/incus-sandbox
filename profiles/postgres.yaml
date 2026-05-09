@@ -1,14 +1,7 @@
 # alc-postgres: postgresql-16 instance 用
-# - /var/lib/postgresql/16/main を worktree 専用 volume に
-# - 起動順は up.sh が依存解決して制御 (このプロファイルだけでは何もしない)
+# - pgdata volume は up.sh が `incus config device add` で instance ごとに足す
 name: alc-postgres
-description: incus-sandbox postgres profile (data volume mount)
+description: incus-sandbox postgres profile (env only; volumes are added per-instance)
 config:
   environment.PGDATA: /var/lib/postgresql/16/main
-devices:
-  # data volume (worktree ごと)。volume 名 alc-pg-data-<wt> を up.sh が注入
-  pgdata:
-    type: disk
-    pool: default
-    source: PLACEHOLDER_PG_VOLUME
-    path: /var/lib/postgresql/16/main
+devices: {}
