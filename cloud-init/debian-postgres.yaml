@@ -68,7 +68,9 @@ runcmd:
   - systemctl enable postgresql
   - systemctl start postgresql
   - /usr/local/bin/incus-sandbox-pg-ready.sh
-  - touch /var/lib/incus-sandbox-warm-ready
+  # マーカーは pg_isready が通った時だけ touch (network 失敗で apt が
+  # 入らなかったケースを検知できるように)
+  - command -v pg_isready >/dev/null && pg_isready -h /var/run/postgresql -U postgres && touch /var/lib/incus-sandbox-warm-ready
 
 locale: C.UTF-8
 timezone: Asia/Tokyo
