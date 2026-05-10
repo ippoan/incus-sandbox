@@ -57,9 +57,12 @@ services:
       CARINS_R2_BUCKET: "dev-carins"
       CARINS_R2_ACCESS_KEY: "dev"
       CARINS_R2_SECRET_KEY: "dev"
-      DTAKO_R2_BUCKET: "dev-dtako"
+      DTAKO_R2_BUCKET: "dtako-uploads"
       DTAKO_R2_ACCESS_KEY: "dev"
       DTAKO_R2_SECRET_KEY: "dev"
+      # ホスト側 wrangler dev (~/js/.dev-proxy/r2-proxy/) 経由で本番 R2 にアクセス。
+      # `wrangler dev --local --port 8788` を起動した状態で Incus から見える host IP。
+      DTAKO_STORAGE_HTTP_PROXY: "http://10.150.0.1:8788"
       API_ORIGIN: "http://127.0.0.1:18080"
       FCM_PROJECT_ID: "dev"
       LINE_LOGIN_CHANNEL_ID: "dev"

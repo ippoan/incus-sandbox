@@ -174,9 +174,8 @@ for svc in "${SERVICES[@]}"; do
       start_instance postgres
       # postgres は cloud-init で自動起動。init SQL 流し込みのみ追加。
       info "applying init SQL to postgres (idempotent)"
-      local init_sql_rel
       init_sql_rel="$(yq -r '.init_sql_path // "scripts/init_local_db.sql"' "$MANIFEST")"
-      local init_sql_host="${WORKTREE_PATH}/${init_sql_rel}"
+      init_sql_host="${WORKTREE_PATH}/${init_sql_rel}"
       if [[ -f "$init_sql_host" ]]; then
         # postgres ready まで待つ + psql で流す
         for i in 1 2 3 4 5 6 7 8 9 10; do
